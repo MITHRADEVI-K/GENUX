@@ -25,10 +25,11 @@ class GenUXDataProcessor {
       throw new Error("data must be a non-empty array")
     }
 
-    // Calculate adaptation effectiveness (paper: personalization + UX sentiment)
+    // Calculate adaptation effectiveness (paper: Personalization + MobileResponsiveness + Accessibility) / 3
     const avgPersonalization = this.calculateAverage(data, "Personalization")
-    const avgUXSentiment = this.calculateUXSentiment(data)
-    this.metrics.adaptationEffectiveness = (avgPersonalization + avgUXSentiment) / 2
+    const avgMobile = this.calculateAverage(data, "Mobile Responsiveness")
+    const avgAccessibility = this.calculateAverage(data, "Accessibility")
+    this.metrics.adaptationEffectiveness = (avgPersonalization + avgMobile + avgAccessibility) / 3
 
     // ML performance and intent match (simple proxies)
     this.metrics.mlPerformance = avgPersonalization
@@ -38,9 +39,7 @@ class GenUXDataProcessor {
     this.metrics.systemResponsiveness = this.calculateAverage(data, "Loading Speed")
     this.metrics.uiGenerationLatency = Math.max(0, (6 - this.metrics.systemResponsiveness) * 60)
 
-    // User engagement: mobile responsiveness + accessibility
-    const avgMobile = this.calculateAverage(data, "Mobile Responsiveness")
-    const avgAccessibility = this.calculateAverage(data, "Accessibility")
+    // User engagement: mobile responsiveness + accessibility (reuse computed averages)
     this.metrics.userEngagement = (avgMobile + avgAccessibility) / 2
 
     // Drift detection accuracy placeholder (will be computed by statistical functions)
@@ -48,6 +47,52 @@ class GenUXDataProcessor {
     this.metrics.driftDetectionAccuracy = Math.max(50, 100 - variance * 10)
 
     return this.metrics
+  }
+
+  // Simple statistical-only baseline detectors
+  zScoreDrift(prevData, currData, metric) {
+    const prevVals = prevData.map((d) => Number.parseFloat(d[metric]) || 0)
+    const currVals = currData.map((d) => Number.parseFloat(d[metric]) || 0)
+    const muPrev = mean(prevVals)
+    const muCurr = mean(currVals)
+    const varPrev = variance(prevVals)
+    const varCurr = variance(currVals)
+    const sigmaPooled = Math.sqrt((varPrev + varCurr) / 2) || 1e-6
+    return Math.abs(muCurr - muPrev) / sigmaPooled
+  }
+
+  // Very small KL-divergence style detector using histograms (discretize into bins)
+  klDivergenceDrift(prevData, currData, metric, bins = 10) {
+    const prevVals = prevData.map((d) => Number.parseFloat(d[metric]) || 0)
+    const currVals = currData.map((d) => Number.parseFloat(d[metric]) || 0)
+    const all = prevVals.concat(currVals)
+    const minV = Math.min(...all)
+    const maxV = Math.max(...all) || minV + 1
+    const width = (maxV - minV) / bins
+    const hist = (arr) => {
+      const h = new Array(bins).fill(1e-6)
+      arr.forEach((v) => {
+        let idx = Math.floor((v - minV) / (width || 1))
+        if (idx < 0) idx = 0
+        if (idx >= bins) idx = bins - 1
+        h[idx] += 1
+      })
+      const sum = h.reduce((s, x) => s + x, 0)
+      return h.map((x) => x / sum)
+    }
+    const p = hist(prevVals)
+    const q = hist(currVals)
+    // symmetric KL (Jensen-Shannon-ish)
+    const m = p.map((pv, i) => (pv + q[i]) / 2)
+    const kl = (a, b) => a.reduce((s, av, i) => s + (av * Math.log((av + 1e-12) / (b[i] + 1e-12))), 0)
+    const js = (kl(p, m) + kl(q, m)) / 2
+    return js
+  }
+
+  // Simple change percent check (paper suggests 10% threshold)
+  isSignificantChangePercent(prevAvg, currAvg, threshold = 0.10) {
+    const cp = this.changePercent(prevAvg, currAvg)
+    return cp > threshold
   }
 
   // Compute statistical significance per paper: average over metrics of |mu_curr - mu_prev| / sigma_pooled
