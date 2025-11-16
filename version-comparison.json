@@ -1,0 +1,34 @@
+[
+  {
+    "transition": "v1.csv -> v2.csv",
+    "prevPersonal": 4.126822801590809,
+    "currPersonal": 0,
+    "changePercent": 2,
+    "statisticalSignificance": 8.717186074913814,
+    "driftScore": 3.77366237408267
+  },
+  {
+    "transition": "v2.csv -> v3.csv",
+    "prevPersonal": 0,
+    "currPersonal": 0,
+    "changePercent": 0,
+    "statisticalSignificance": 0,
+    "driftScore": 0.28678794411714426
+  },
+  {
+    "transition": "v3.csv -> v4.csv",
+    "prevPersonal": 0,
+    "currPersonal": 0,
+    "changePercent": 0,
+    "statisticalSignificance": 0,
+    "driftScore": 0.28678794411714426
+  },
+  {
+    "transition": "v4.csv -> v5.csv",
+    "prevPersonal": 0,
+    "currPersonal": 0,
+    "changePercent": 0,
+    "statisticalSignificance": 0,
+    "driftScore": 0.28678794411714426
+  }
+]
